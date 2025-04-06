@@ -8,6 +8,7 @@
 
 #include <string.h>
 #include <errno.h>
+#include <stdarg.h>
 
 #include <petnet.h>
 
@@ -30,13 +31,17 @@
 
 extern int petnet_errno;
 
+// Forward declarations
+static void __setup_new_connection(struct tcp_connection *);
+static void __update_rtt_estimate(struct tcp_connection *, uint32_t);
+static void __handle_packet_timeout(struct tcp_connection *);
+
 struct tcp_state {
     struct tcp_con_map * con_map;
 };
 
-static void __print_debug_msg(const char *);
+static void __print_debug_msg(const char *fmt, ...);
 static struct packet *__construct_pkt(struct tcp_connection *);
-static int __send_data_pkt(struct tcp_connection *);
 static int __send_flagged_pkt(struct tcp_connection *, uint8_t, uint8_t, uint8_t, uint8_t, uint8_t, uint8_t);
 static int __close_connection(struct tcp_connection *);
 static int __tcp_pkt_rx_ipv4(struct packet *);
@@ -213,10 +218,14 @@ tcp_connect_ipv4(struct socket    * sock,
     return 0;
 }
 
-static void __print_debug_msg(const char *msg) {
-    if (petnet_state->debug_enable) {
-        pet_printf(msg);
+static void __print_debug_msg(const char *fmt, ...) {
+    if (!petnet_state->debug_enable) {
+        return;
     }
+    va_list args;
+    va_start(args, fmt);
+    pet_vprintf(fmt, args);
+    va_end(args);
 }
 
 // constructs a new packet for the specified tcp_connection
@@ -710,7 +719,7 @@ __handle_packet_timeout(struct tcp_connection * tcp_conn) {
     // 1 + 2 + 4 + 8 + 16 = 31 seconds before giving up
     // This seemed reasonable for a local network
     const int MAX_RETRIES = 5;
-    if (tcp_conn->retransmit_count > MAX_RETRIES) {
+    if (tcp_conn->retransmit_count > (uint32_t)MAX_RETRIES) {
         // Too many retries - connection is probably dead
         __print_debug_msg("Max retransmissions reached - closing connection\n");
         __close_connection(tcp_conn);
