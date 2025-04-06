@@ -6,9 +6,10 @@
  * redistribute, and modify it as specified in the file "PETLAB_LICENSE".
  */
 
+#include <stdio.h>
+#include <stdarg.h>
 #include <string.h>
 #include <errno.h>
-#include <stdarg.h>
 
 #include <petnet.h>
 
@@ -34,7 +35,7 @@ extern int petnet_errno;
 // Forward declarations
 static void __setup_new_connection(struct tcp_connection *);
 static void __update_rtt_estimate(struct tcp_connection *, uint32_t);
-static void __handle_packet_timeout(struct tcp_connection *);
+static int __handle_packet_timeout(struct tcp_connection *);
 
 struct tcp_state {
     struct tcp_con_map * con_map;
@@ -224,8 +225,10 @@ static void __print_debug_msg(const char *fmt, ...) {
     }
     va_list args;
     va_start(args, fmt);
-    pet_vprintf(fmt, args);
+    char buf[256];  // Reasonable size for our debug messages
+    vsnprintf(buf, sizeof(buf), fmt, args);  // Format to buffer
     va_end(args);
+    pet_printf("%s", buf);  // Use pet_printf with formatted string
 }
 
 // constructs a new packet for the specified tcp_connection
